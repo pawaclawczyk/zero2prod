@@ -1,0 +1,78 @@
+name: Main
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout the repository
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Cache Cargo dependencies
+      - name: Cache Cargo registry and index
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+
+      # Cache Cargo build artifacts
+      - name: Cache Cargo build artifacts
+        uses: actions/cache@v4
+        with:
+          path: target/
+          key: ${{ runner.os }}-cargo-target-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-target-
+
+      # Install the Rust toolchain
+      - name: Install Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          override: true
+          toolchain: stable # Specify Rust version or 'stable', 'beta', 'nightly'
+          components: clippy, rustfmt # Install additional components
+
+      # Build the code
+      - name: Build Rust project
+        run: cargo build --verbose
+
+      # Run tests
+      - name: Run tests
+        run: cargo test --verbose
+
+      # Run Clippy for linting (Optional)
+      - name: Run lint checks
+        run: cargo clippy -- -D warnings
+
+      # Run rustfmt to ensure code is formatted correctly (Optional)
+      - name: Run rustfmt check
+        run: cargo fmt -- --check
+
+      # Cache cargo-audit binary
+      - name: Cache cargo-audit
+        uses: actions/cache@v4
+        with:
+          path: ~/.cargo/bin/cargo-audit
+          key: ${{ runner.os }}-cargo-audit-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-audit-
+
+      # Run security audit
+      - name: Run security audit
+        run: |
+          cargo install cargo-audit || echo "cargo-audit is already installed"
+          cargo audit
