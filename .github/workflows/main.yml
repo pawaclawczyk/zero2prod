@@ -8,16 +8,29 @@ on:
     branches:
       - main
 
+env:
+  POSTGRES_USER: zero2prod
+  POSTGRES_PASSWORD: zero2prod
+  POSTGRES_DATABASE: zero2prod
+  POSTGRES_HOST: 127.0.0.1
+  POSTGRES_PORT: 5432
+
 jobs:
   build:
     runs-on: ubuntu-latest
 
     steps:
-      # Checkout the repository
+      - name: Build `DATABASE_URL` dynamically
+        run: |
+          export DATABASE_URL="postgres://${POSTGRES_USER}:${POSTGRES_PASSWORD}@${POSTGRES_HOST}:${POSTGRES_PORT}/${POSTGRES_DATABASE}"
+          echo "DATABASE_URL=${DATABASE_URL}" >> $GITHUB_ENV
+
+      - name: Show `DATABASE_URL`
+        run: echo $DATABASE_URL
+
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Cache Cargo dependencies
       - name: Cache Cargo registry and index
         uses: actions/cache@v4
         with:
@@ -28,7 +41,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-
 
-      # Cache Cargo build artifacts
       - name: Cache Cargo build artifacts
         uses: actions/cache@v4
         with:
@@ -37,32 +49,48 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-target-
 
-      # Install the Rust toolchain
+      - name: Start services with Docker Compose
+        run: |
+          docker compose up -d
+          # Wait for database to be ready, break after 1 minute
+          TIMEOUT=12 # 12 retries (12 * 5 seconds = 60 seconds max)
+          COUNT=0
+          until docker compose exec postgres pg_isready -U ${{ env.POSTGRES_USER }}; do
+            echo "Waiting for database to be ready..."
+            sleep 5
+            COUNT=$((COUNT+1))
+            if [ $COUNT -ge $TIMEOUT ]; then
+              echo "Timeout: Database did not become ready after 1 minute."
+              docker-compose logs postgres
+              exit 1
+            fi
+          done
+
       - name: Install Rust
         uses: actions-rs/toolchain@v1
         with:
           profile: minimal
           override: true
-          toolchain: stable # Specify Rust version or 'stable', 'beta', 'nightly'
-          components: clippy, rustfmt # Install additional components
+          toolchain: stable
+          components: clippy, rustfmt
 
-      # Build the code
+      - name: Run migrations
+        run: |
+          cargo install sqlx-cli --no-default-features --features native-tls,postgres || echo "sqlx-cli is already installed"
+          sqlx migrate run
+
       - name: Build Rust project
         run: cargo build --verbose
 
-      # Run tests
       - name: Run tests
         run: cargo test --verbose
 
-      # Run Clippy for linting (Optional)
       - name: Run lint checks
         run: cargo clippy -- -D warnings
 
-      # Run rustfmt to ensure code is formatted correctly (Optional)
       - name: Run rustfmt check
         run: cargo fmt -- --check
 
-      # Cache cargo-audit binary
       - name: Cache cargo-audit
         uses: actions/cache@v4
         with:
@@ -71,7 +99,6 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-audit-
 
-      # Run security audit
       - name: Run security audit
         run: |
           cargo install cargo-audit || echo "cargo-audit is already installed"
