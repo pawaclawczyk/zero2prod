@@ -1,15 +1,17 @@
-use sqlx::PgPool;
+use sqlx::{Connection, Executor, PgPool};
 use std::net::TcpListener;
-use zero2prod::configuration::get_configuration;
+use uuid::Uuid;
+use zero2prod::configuration::{DatabaseSettings, Settings, get_configuration};
 
 pub struct TestApp {
     pub address: String,
     pub connection_pool: PgPool,
+    pub configuration: Settings,
 }
 
 #[tokio::test]
 async fn test_health_check() {
-    let app = spawn_app().await;
+    let app = set_up_app().await;
     let client = reqwest::Client::new();
 
     let response = client
@@ -24,7 +26,7 @@ async fn test_health_check() {
 
 #[tokio::test]
 async fn subscribe_returns_a_200_for_valid_form_data() {
-    let app = spawn_app().await;
+    let app = set_up_app().await;
     let client = reqwest::Client::new();
 
     let body = "email=john%40example.com&name=John%20Doe";
@@ -50,7 +52,7 @@ async fn subscribe_returns_a_200_for_valid_form_data() {
 
 #[tokio::test]
 async fn subscribe_returns_a_400_when_data_is_missing() {
-    let app = spawn_app().await;
+    let app = set_up_app().await;
     let client = reqwest::Client::new();
     let test_cases = vec![
         ("", "missing both email and name"),
@@ -76,16 +78,16 @@ async fn subscribe_returns_a_400_when_data_is_missing() {
     }
 }
 
-async fn spawn_app() -> TestApp {
+async fn set_up_app() -> TestApp {
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind to random port.");
     let port = listener.local_addr().unwrap().port();
     let address = format!("http://127.0.0.1:{}", port);
 
-    let configuration = get_configuration().expect("Failed to read configuration.");
+    let mut configuration = get_configuration().expect("Failed to read configuration.");
+    let database_name = Uuid::new_v4().to_string();
+    configuration.database.database_name = database_name;
 
-    let connection_pool = PgPool::connect(&configuration.database.connection_string())
-        .await
-        .expect("Failed to connect to database.");
+    let connection_pool = set_up_database(&configuration.database).await;
 
     let server = zero2prod::startup::run(listener, connection_pool.clone())
         .expect("Failed to bind address.");
@@ -96,5 +98,28 @@ async fn spawn_app() -> TestApp {
     TestApp {
         address,
         connection_pool,
+        configuration,
     }
+}
+
+async fn set_up_database(configuration: &DatabaseSettings) -> PgPool {
+    let mut connection =
+        sqlx::PgConnection::connect(&configuration.connection_string_without_database())
+            .await
+            .expect("Failed to connect to database.");
+    connection
+        .execute(format!(r#"CREATE DATABASE "{}";"#, configuration.database_name).as_str())
+        .await
+        .expect("Failed to create database.");
+
+    let pool = sqlx::PgPool::connect(&configuration.connection_string())
+        .await
+        .expect("Failed to connect to database.");
+
+    sqlx::migrate!("./migrations")
+        .run(&pool)
+        .await
+        .expect("Failed to run migrations.");
+
+    pool
 }
