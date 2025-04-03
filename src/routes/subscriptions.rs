@@ -18,13 +18,16 @@ fn mask(text: &str) -> String {
 
 pub async fn subscribe(data: Form<SubscribeForm>, connection: web::Data<PgPool>) -> impl Responder {
     let request_id = Uuid::new_v4();
-    log::info!(
+    let span = tracing::info_span!("subscribe", %request_id, email = %mask(&data.email), name = %mask(&data.name));
+    let _span_guard = span.enter();
+
+    tracing::info!(
         "{} - Adding {} {} as a new subscriber",
         request_id,
         mask(&data.name),
         mask(&data.email),
     );
-    log::info!(
+    tracing::info!(
         "{} - Saving new subscriber details in the database",
         request_id
     );
@@ -42,11 +45,11 @@ pub async fn subscribe(data: Form<SubscribeForm>, connection: web::Data<PgPool>)
     .await
     {
         Ok(_) => {
-            log::info!("{} - New subscriber details have been saved", request_id);
+            tracing::info!("{} - New subscriber details have been saved", request_id);
             HttpResponse::Ok()
         }
         Err(e) => {
-            log::error!("{} - Failed to execute query: {:?}", request_id, e);
+            tracing::error!("{} - Failed to execute query: {:?}", request_id, e);
             HttpResponse::InternalServerError()
         }
     }
