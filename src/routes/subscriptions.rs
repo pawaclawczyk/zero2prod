@@ -1,10 +1,9 @@
-use actix_web::web::Form;
-use actix_web::{HttpResponse, Responder, web};
-use chrono::Utc;
-use sqlx::PgPool;
-use tracing::Instrument;
+use actix_web::{HttpResponse, web};
+use chrono;
+use sqlx;
+use tracing;
 use unicode_segmentation::UnicodeSegmentation;
-use uuid::Uuid;
+use uuid;
 
 #[derive(serde::Deserialize)]
 pub struct SubscribeForm {
@@ -17,45 +16,47 @@ fn mask(text: &str) -> String {
     format!("{}{}", prefix, "*".repeat(7))
 }
 
-pub async fn subscribe(data: Form<SubscribeForm>, connection: web::Data<PgPool>) -> impl Responder {
-    let request_id = Uuid::new_v4();
-    let span = tracing::info_span!("subscribe", %request_id, email = %mask(&data.email), name = %mask(&data.name));
-    let _span_guard = span.enter();
+#[tracing::instrument(
+    name = "Adding a new subscriber",
+    skip(data, connection),
+    fields(
+        subscriber_email = %mask(&data.email),
+        subscriber_name = %mask(&data.name),
+    )
+)]
+pub async fn subscribe(
+    data: web::Form<SubscribeForm>,
+    connection: web::Data<sqlx::PgPool>,
+) -> HttpResponse {
+    match insert_subscriber(&data, &connection).await {
+        Ok(_) => HttpResponse::Ok().finish(),
+        Err(_) => HttpResponse::InternalServerError().finish(),
+    }
+}
 
-    tracing::info!(
-        "{} - Adding {} {} as a new subscriber",
-        request_id,
-        mask(&data.name),
-        mask(&data.email),
-    );
-    tracing::info!(
-        "{} - Saving new subscriber details in the database",
-        request_id
-    );
-
-    let query_span = tracing::info_span!("Saving new subscriber details in the database");
-
-    match sqlx::query!(
+#[tracing::instrument(
+    name = "Saving new subscriber details in the database",
+    skip(data, connection)
+)]
+async fn insert_subscriber(
+    data: &SubscribeForm,
+    connection: &sqlx::PgPool,
+) -> Result<(), sqlx::Error> {
+    sqlx::query!(
         r#"
         INSERT INTO subscriptions (id, email, name, subscribed_at)
         VALUES ($1, $2, $3, $4)
         "#,
-        Uuid::new_v4(),
+        uuid::Uuid::new_v4(),
         data.email,
         data.name,
-        Utc::now()
+        chrono::Utc::now()
     )
-    .execute(connection.get_ref())
-    .instrument(query_span)
+    .execute(connection)
     .await
-    {
-        Ok(_) => {
-            tracing::info!("{} - New subscriber details have been saved", request_id);
-            HttpResponse::Ok()
-        }
-        Err(e) => {
-            tracing::error!("{} - Failed to execute query: {:?}", request_id, e);
-            HttpResponse::InternalServerError()
-        }
-    }
+    .map_err(|e| {
+        tracing::error!("Failed to execute query: {:?}", e);
+        e
+    })?;
+    Ok(())
 }

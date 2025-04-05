@@ -1,7 +1,12 @@
+use secrecy::ExposeSecret;
 use sqlx::{Connection, Executor, PgPool};
 use std::net::TcpListener;
+use std::sync;
 use uuid::Uuid;
 use zero2prod::configuration::{DatabaseSettings, Settings, get_configuration};
+use zero2prod::telemetry::{init_subscriber, make_subscriber};
+
+static TRACING: sync::Once = sync::Once::new();
 
 pub struct TestApp {
     pub address: String,
@@ -79,6 +84,18 @@ async fn subscribe_returns_a_400_when_data_is_missing() {
 }
 
 async fn set_up_app() -> TestApp {
+    TRACING.call_once_force(|_| {
+        let name = "test".to_string();
+        let directive = "info";
+        if std::env::var("TEST_LOG").is_ok() {
+            let subscriber = make_subscriber(name, directive, std::io::stdout);
+            init_subscriber(subscriber);
+        } else {
+            let subscriber = make_subscriber(name, directive, std::io::sink);
+            init_subscriber(subscriber);
+        };
+    });
+
     let listener = TcpListener::bind("127.0.0.1:0").expect("Failed to bind to random port.");
     let port = listener.local_addr().unwrap().port();
     let address = format!("http://127.0.0.1:{}", port);
@@ -103,16 +120,19 @@ async fn set_up_app() -> TestApp {
 }
 
 async fn set_up_database(configuration: &DatabaseSettings) -> PgPool {
-    let mut connection =
-        sqlx::PgConnection::connect(&configuration.connection_string_without_database())
-            .await
-            .expect("Failed to connect to database.");
+    let mut connection = sqlx::PgConnection::connect(
+        configuration
+            .connection_string_without_database()
+            .expose_secret(),
+    )
+    .await
+    .expect("Failed to connect to database.");
     connection
         .execute(format!(r#"CREATE DATABASE "{}";"#, configuration.database_name).as_str())
         .await
         .expect("Failed to create database.");
 
-    let pool = sqlx::PgPool::connect(&configuration.connection_string())
+    let pool = sqlx::PgPool::connect(configuration.connection_string().expose_secret())
         .await
         .expect("Failed to connect to database.");
 
