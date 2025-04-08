@@ -3,7 +3,7 @@ use secrecy::{ExposeSecret, SecretString};
 #[derive(serde::Deserialize)]
 pub struct Settings {
     pub database: DatabaseSettings,
-    pub application_port: u16,
+    pub application: ApplicationSettings,
 }
 
 #[derive(serde::Deserialize)]
@@ -15,10 +15,22 @@ pub struct DatabaseSettings {
     pub database_name: String,
 }
 
+#[derive(serde::Deserialize)]
+pub struct ApplicationSettings {
+    pub host: String,
+    pub port: u16,
+}
+
 pub fn get_configuration() -> Result<Settings, config::ConfigError> {
+    let environment_name = std::env::var("APP_ENVIRONMENT").unwrap_or_else(|_| "local".into());
+    let environment_file_name = format!("{}.yaml", environment_name);
     let settings = config::Config::builder()
         .add_source(config::File::new(
             "configuration.yaml",
+            config::FileFormat::Yaml,
+        ))
+        .add_source(config::File::new(
+            &environment_file_name,
             config::FileFormat::Yaml,
         ))
         .build()?;

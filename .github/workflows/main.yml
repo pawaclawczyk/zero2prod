@@ -51,7 +51,7 @@ jobs:
 
       - name: Start services with Docker Compose
         run: |
-          docker compose up -d
+          docker compose up -d postgres
           # Wait for database to be ready, break after 1 minute
           TIMEOUT=12 # 12 retries (12 * 5 seconds = 60 seconds max)
           COUNT=0

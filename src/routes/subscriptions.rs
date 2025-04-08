@@ -1,9 +1,9 @@
 use actix_web::{HttpResponse, web};
-use chrono;
+use chrono::Utc;
 use sqlx;
 use tracing;
 use unicode_segmentation::UnicodeSegmentation;
-use uuid;
+use uuid::Uuid;
 
 #[derive(serde::Deserialize)]
 pub struct SubscribeForm {
@@ -47,10 +47,10 @@ async fn insert_subscriber(
         INSERT INTO subscriptions (id, email, name, subscribed_at)
         VALUES ($1, $2, $3, $4)
         "#,
-        uuid::Uuid::new_v4(),
+        Uuid::new_v4(),
         data.email,
         data.name,
-        chrono::Utc::now()
+        Utc::now()
     )
     .execute(connection)
     .await
