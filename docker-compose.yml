@@ -1,15 +1,4 @@
 services:
-  zero2prod:
-    image: zero2prod
-    build: .
-    container_name: zero2prod_container
-    environment:
-      - APP_ENVIRONMENT=production
-    ports:
-      - "8000:8000"
-    depends_on:
-      - postgres
-
   postgres:
     image: postgres:latest
     container_name: postgres_container

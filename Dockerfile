@@ -1,4 +1,18 @@
-FROM rust:1.86.0-alpine AS builder
+## Base
+FROM lukemathwalker/cargo-chef:latest-rust-1.86.0-alpine AS chef
+
+WORKDIR /app
+
+## Planner
+FROM chef AS planner
+
+COPY Cargo.lock .
+COPY Cargo.toml .
+
+RUN cargo chef prepare --recipe-path recipe.json
+
+## Builder
+FROM chef AS builder
 
 RUN apk add --no-cache \
     musl-dev \
@@ -10,7 +24,9 @@ RUN apk add --no-cache \
     make \
     bash
 
-WORKDIR /app
+COPY --from=planner /app/recipe.json recipe.json
+
+RUN cargo chef cook --release --recipe-path recipe.json
 
 COPY . .
 
@@ -24,7 +40,7 @@ ENV APP_ENVIRONMENT=production
 WORKDIR /app
 
 COPY --from=builder /app/target/release/zero2prod .
-COPY --from=builder /app/configuration.yaml .
-COPY --from=builder /app/production.yaml .
+COPY configuration.yaml .
+COPY production.yaml .
 
 ENTRYPOINT ["/app/zero2prod"]
