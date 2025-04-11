@@ -40,7 +40,6 @@ ENV APP_ENVIRONMENT=production
 WORKDIR /app
 
 COPY --from=builder /app/target/release/zero2prod .
-COPY configuration.yaml .
-COPY production.yaml .
+COPY etc/ etc/
 
 ENTRYPOINT ["/app/zero2prod"]

@@ -1,4 +1,3 @@
-use secrecy::ExposeSecret;
 use sqlx::{Connection, Executor, PgPool};
 use std::net::TcpListener;
 use std::sync;
@@ -120,19 +119,15 @@ async fn set_up_app() -> TestApp {
 }
 
 async fn set_up_database(configuration: &DatabaseSettings) -> PgPool {
-    let mut connection = sqlx::PgConnection::connect(
-        configuration
-            .connection_string_without_database()
-            .expose_secret(),
-    )
-    .await
-    .expect("Failed to connect to database.");
+    let mut connection = sqlx::PgConnection::connect_with(&configuration.without_db())
+        .await
+        .expect("Failed to connect to database.");
     connection
         .execute(format!(r#"CREATE DATABASE "{}";"#, configuration.database_name).as_str())
         .await
         .expect("Failed to create database.");
 
-    let pool = sqlx::PgPool::connect(configuration.connection_string().expose_secret())
+    let pool = PgPool::connect_with(configuration.with_db())
         .await
         .expect("Failed to connect to database.");
 
