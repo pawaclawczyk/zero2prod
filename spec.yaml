@@ -38,8 +38,6 @@ databases:
     engine: PG
     version: "17"
     production: false
-    db_name: newsletter
-    db_user: newsletter
 ingress:
   rules:
     - match:
@@ -47,3 +45,17 @@ ingress:
           prefix: /
       component:
         name: zero2prod
+jobs:
+  - name: migrate
+    github:
+      repo: pawaclawczyk/zero2prod
+      branch: main
+      deploy_on_push: true
+    dockerfile_path: migrate.dockerfile
+    envs:
+      - key: DATABASE_URL
+        value: "postgres://${newsletter.USERNAME}:${newsletter.PASSWORD}@${newsletter.HOSTNAME}:${newsletter.PORT}/${newsletter.DATABASE}?sslmode=require"
+        scope: RUN_TIME
+    instance_size_slug: apps-s-1vcpu-0.5gb
+    instance_count: 1
+    kind: POST_DEPLOY
