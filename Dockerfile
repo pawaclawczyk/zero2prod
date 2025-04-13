@@ -5,7 +5,8 @@ RUN apt update && apt install lld clang openssl libssl-dev pkg-config -y
 
 ## Planner
 FROM chef AS planner
-COPY . .
+COPY Cargo.lock .
+COPY Cargo.toml .
 RUN cargo chef prepare --recipe-path recipe.json
 
 ## Builder
