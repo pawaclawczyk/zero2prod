@@ -51,10 +51,10 @@ jobs:
       repo: pawaclawczyk/zero2prod
       branch: main
       deploy_on_push: true
-    dockerfile_path: migrate.dockerfile
+    dockerfile_path: Dockerfile
     envs:
       - key: DATABASE_URL
-        value: "postgres://${newsletter.USERNAME}:${newsletter.PASSWORD}@${newsletter.HOSTNAME}:${newsletter.PORT}/${newsletter.DATABASE}?sslmode=require"
+        value: "${newsletter.DATABASE_URL}"
         scope: RUN_TIME
     instance_size_slug: apps-s-1vcpu-0.5gb
     instance_count: 1
