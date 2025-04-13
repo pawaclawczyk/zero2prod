@@ -33,6 +33,21 @@ services:
       - key: APP_DATABASE__DATABASE_NAME
         scope: RUN_TIME
         value: ${newsletter.DATABASE}
+workers:
+  - name: migrate
+    github:
+      repo: pawaclawczyk/zero2prod
+      branch: main
+      deploy_on_push: true
+    dockerfile_path: migrate.dockerfile
+    envs:
+      - key: DATABASE_URL
+        value: "${newsletter.DATABASE_URL}"
+        scope: RUN_TIME
+    instance_size_slug: apps-s-1vcpu-0.5gb
+    instance_count: 1
+#    kind: POST_DEPLOY
+
 databases:
   - name: newsletter
     engine: PG
@@ -45,17 +60,17 @@ ingress:
           prefix: /
       component:
         name: zero2prod
-jobs:
-  - name: migrate
-    github:
-      repo: pawaclawczyk/zero2prod
-      branch: main
-      deploy_on_push: true
-    dockerfile_path: Dockerfile
-    envs:
-      - key: DATABASE_URL
-        value: "${newsletter.DATABASE_URL}"
-        scope: RUN_TIME
-    instance_size_slug: apps-s-1vcpu-0.5gb
-    instance_count: 1
-    kind: POST_DEPLOY
+#jobs:
+#  - name: migrate
+#    github:
+#      repo: pawaclawczyk/zero2prod
+#      branch: main
+#      deploy_on_push: true
+#    dockerfile_path: migrate.dockerfile
+#    envs:
+#      - key: DATABASE_URL
+#        value: "${newsletter.DATABASE_URL}"
+#        scope: RUN_TIME
+#    instance_size_slug: apps-s-1vcpu-0.5gb
+#    instance_count: 1
+#    kind: POST_DEPLOY
