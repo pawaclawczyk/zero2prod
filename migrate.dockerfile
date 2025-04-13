@@ -1,4 +1,4 @@
-FROM rust:1.86.0
+FROM rust:1.86.0-bookworm
 
 RUN cargo install sqlx-cli
 
