@@ -5,4 +5,4 @@ RUN cargo install sqlx-cli
 COPY migrations/ migrations/
 
 #ENTRYPOINT ["sqlx", "migrate", "run"]
-RUN ["sleep", "infinity"]
+CMD ["sleep", "infinity"]
