@@ -1,5 +1,5 @@
 ## Base
-FROM lukemathwalker/cargo-chef:latest-rust-1.86.0 AS chef
+FROM lukemathwalker/cargo-chef:latest-rust-1.86.0-slim-bookworm AS chef
 WORKDIR /app
 RUN apt update && apt install lld clang -y
 
@@ -17,7 +17,7 @@ ENV SQLS_OFFLINE=true
 RUN cargo build --release
 
 ## Runner
-FROM debian:bullseye-slim AS runner
+FROM debian:bookworm-slim AS runner
 WORKDIR /APP
 RUN apt update -y \
     && apt install -y --no-install-recommends openssl ca-certificates \
