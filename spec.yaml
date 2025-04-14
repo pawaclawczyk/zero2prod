@@ -33,7 +33,19 @@ services:
       - key: APP_DATABASE__DATABASE_NAME
         scope: RUN_TIME
         value: ${newsletter.DATABASE}
-workers:
+databases:
+  - name: newsletter
+    engine: PG
+    version: "14"  # In higher version, the user does not have permissions to create tables
+    production: false
+ingress:
+  rules:
+    - match:
+        path:
+          prefix: /
+      component:
+        name: zero2prod
+jobs:
   - name: migrate
     github:
       repo: pawaclawczyk/zero2prod
@@ -46,31 +58,4 @@ workers:
         scope: RUN_TIME
     instance_size_slug: apps-s-1vcpu-0.5gb
     instance_count: 1
-#    kind: POST_DEPLOY
-
-databases:
-  - name: newsletter
-    engine: PG
-    version: "17"
-    production: false
-ingress:
-  rules:
-    - match:
-        path:
-          prefix: /
-      component:
-        name: zero2prod
-#jobs:
-#  - name: migrate
-#    github:
-#      repo: pawaclawczyk/zero2prod
-#      branch: main
-#      deploy_on_push: true
-#    dockerfile_path: migrate.dockerfile
-#    envs:
-#      - key: DATABASE_URL
-#        value: "${newsletter.DATABASE_URL}"
-#        scope: RUN_TIME
-#    instance_size_slug: apps-s-1vcpu-0.5gb
-#    instance_count: 1
-#    kind: POST_DEPLOY
+    kind: POST_DEPLOY
