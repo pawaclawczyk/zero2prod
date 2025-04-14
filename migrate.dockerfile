@@ -3,4 +3,4 @@ WORKDIR /app
 RUN cargo install sqlx-cli
 COPY migrations/ migrations/
 
-ENTRYPOINT ["sqlx", "migrate", "run"]
+CMD ["sqlx", "migrate", "run"]
